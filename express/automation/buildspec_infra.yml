@@ -1,11 +1,9 @@
 # Sample buildspec for checking PR in codecommit
+# Allow codebuild role to create EKS resources
 version: 0.2
 env:
   variables:
     TERRAFORM_VERSION: "0.14.11"
-  parameter-store:
-    TF_VAR_aws_access_key: DEV_ACCESS_KEY
-    TF_VAR_aws_secret_key: DEV_SECRET_KEY
 phases:
   install:
     runtime-versions:

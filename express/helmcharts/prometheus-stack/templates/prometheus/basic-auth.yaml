@@ -1,0 +1,29 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.basicAuth.enabled }}
+apiVersion: getambassador.io/v2
+kind: Filter
+metadata:
+  name: auth-filter
+spec:
+  External:
+    auth_service: "{{ .Values.prometheus.basicAuth.authService }}"    
+    path_prefix: "{{ .Values.prometheus.basicAuth.pathPrefix }}"
+    allowed_request_headers:
+    - "x-qotm-session"
+    allowed_authorization_headers:
+    - "x-qotm-session"
+
+---
+apiVersion: getambassador.io/v2
+kind: FilterPolicy
+metadata:
+  name: prometheus-filterpolicy
+spec:
+  # everything defaults to private; you can create rules to make stuff
+  # public, and you can create rules to require additional scopes
+  # which will be automatically checked
+  rules:
+  - host: "{{ .Values.prometheus.basicAuth.hostFilter }}"
+    path: "*"
+    filters:
+    - name: auth-filter
+{{ end }}

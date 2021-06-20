@@ -1,0 +1,29 @@
+# Sample buildspec for checking PR in codecommit
+# Allow codebuild role to login to EKS cluster
+version: 0.2
+env:
+  variables:
+    HELM_VERSION: "3.6.1"
+    INSTALL_ENV: "development"
+    INSTALL_CLUSTER: "clustername"
+    INSTALL_REGION: "aws_region"
+phases:
+  install:
+    runtime-versions:
+      nodejs: 10
+    commands:
+      - wget https://get.helm.sh/helm-v"$HELM_VERSION"-linux-amd64.tar.gz
+      - tar -zxvf helm-v"$HELM_VERSION"-linux-amd64.tar.gz
+      - mv linux-amd64/helm /usr/local/bin/helm
+      - helm version
+      - curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.19.7/bin/linux/amd64/kubectl;
+      - chmod u+x kubectl && mv kubectl /usr/local/bin/kubectl
+  build:
+    commands:
+      - echo "Running terraform plan"
+      - touch ~/.kube/config
+      - export KUBECONFIG=~/.kube/config
+      - aws eks --region $INSTALL_REGION update-kubeconfig --name $INSTALL_CLUSTER
+      - kubectl create namespace notejam
+      - helm upgrade --install  ambassador ambassador
+      - helm upgrade --install  notejam-express notejam-express

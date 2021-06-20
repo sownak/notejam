@@ -1,0 +1,43 @@
+# Sample buildspec for checking PR in codecommit
+version: 0.2
+env:
+  variables:
+    APP_VERSION: "0.0.1-SNAPSHOT"
+phases:
+  install:
+    runtime-versions:      
+      nodejs: 10
+    commands:
+      - git config --global credential.helper '!aws codecommit credential-helper $@'
+      - git config --global credential.UseHttpPath true
+  pre_build:
+    commands:
+      - build_name=$(echo $CODEBUILD_BUILD_ID | cut -d':' -f1)
+      - build_id=$(echo $CODEBUILD_BUILD_ID | cut -d':' -f2)
+      - link=$(echo "https://$AWS_DEFAULT_REGION.console.aws.amazon.com/codesuite/codebuild/projects/$build_name/build/$build_name%3A$build_id")
+      - aws codecommit post-comment-for-pull-request --pull-request-id $PULL_REQUEST_ID --repository-name $REPOSITORY_NAME --before-commit-id $DESTINATION_COMMIT --after-commit-id $SOURCE_COMMIT --content "Codebuild link $link"
+      - git checkout $SOURCE_COMMIT
+  build:
+    commands:
+      # initialize result status
+      - result=FAILURE
+      - echo Running static tests
+      - npm install
+      - ./node_modules/mocha/bin/mocha tests
+      - echo Tests passed
+      # set result as success
+      - result=SUCCESS
+  post_build:
+    commands:
+      - |
+        if [ $result = "SUCCESS" ]; then
+          content=$(echo "Build Succesful");
+          aws codecommit update-pull-request-approval-state --pull-request-id $PULL_REQUEST_ID --approval-state APPROVE --revision-id $REVISION_ID;
+        elif [ $result = "FAILURE" ]; then
+          content=$(echo "Build Failed. Please review build logs");
+        else
+          content="An unexpected error occurred while building application";
+        fi
+      - aws codecommit post-comment-for-pull-request --pull-request-id $PULL_REQUEST_ID --repository-name $REPOSITORY_NAME --before-commit-id $DESTINATION_COMMIT --after-commit-id $SOURCE_COMMIT --content "$content"
+
+    

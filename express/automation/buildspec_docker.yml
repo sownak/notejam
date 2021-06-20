@@ -1,0 +1,38 @@
+# Sample buildspec for building docker image
+version: 0.2
+env:
+  # Set variables
+  variables:
+    ECR_REGISTRY: "docker-url"
+    ECR_REPOSITORY_NAME: "notejam"
+    APP_VERSION: "0.0.1-SNAPSHOT"
+    ENV: "staging"
+    IMAGE_TAG: "latest"
+  # Parameter Store variables can be added as well
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+      nodejs: 10
+  pre_build:
+    # Execute pre build commands like login to docker registry
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY      
+  build:
+    # Execute tests and docker build
+    commands:
+      - echo Running static tests
+      - npm install
+      - ./node_modules/mocha/bin/mocha tests
+      - echo Tests passed
+      - echo Building the Docker image... 
+      - docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$ENV-$APP_VERSION  --build-arg version=$APP_VERSION .
+      - docker tag $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$ENV-$APP_VERSION $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG
+  post_build:
+    # Push to docker registry
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$ENV-$APP_VERSION
+      - docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG

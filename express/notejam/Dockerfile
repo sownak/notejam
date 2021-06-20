@@ -11,6 +11,7 @@ RUN npm install
 
 #Variables for ENV file
 ENV PORT=3000
+ENV NODE_ENV=test
 
 EXPOSE ${PORT}
-CMD [ "./bin/www" ]
+CMD [ "npm start" ]

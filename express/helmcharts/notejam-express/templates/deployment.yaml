@@ -1,0 +1,83 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: {{ .Values.nodeName }}
+  {{- if .Values.deployment.annotations }}
+    annotations:
+{{ toYaml .Values.deployment.annotations | indent 8 }}
+  {{- end }}
+  namespace: {{ .Values.metadata.namespace }}
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/name: {{ .Values.nodeName }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ .Values.nodeName }}
+spec:
+  serviceName: {{ .Values.nodeName }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.nodeName }}
+      app.kubernetes.io/name: {{ .Values.nodeName }}
+      helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+      app.kubernetes.io/name: {{ .Values.nodeName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}  
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.nodeName }}
+        app.kubernetes.io/name: {{ .Values.nodeName }}
+        helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        app.kubernetes.io/name: {{ .Values.nodeName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:      
+      hostname: {{ .Values.nodeName }}
+      initContainers:
+      # Use initcontainer to initialise the database
+      - name: db-init
+        image: {{ .Values.expressapp.image }}
+        imagePullPolicy: {{ .Values.expressapp.pullPolicy }}
+        env:
+        - name: NODE_ENV
+          value: {{ .Values.metadata.env }}
+        command: ["sh"]
+        args:
+        - "-cx"
+        - "mkdir -p /app/db;          
+          echo $NODE_ENV;
+          if [ ! -f /app/db/{{ .Values.metadata.env }}_database_initialised ]; then
+            node db.js;
+            date > /app/db/{{ .Values.metadata.env }}_database_initialised;
+          fi;
+          "        
+        volumeMounts:
+        - name: {{ .Values.nodeName }}-data
+          mountPath: /app/db
+      containers:     
+      - name: expressapp
+        image: {{ .Values.expressapp.image }}
+        imagePullPolicy: {{ .Values.expressapp.pullPolicy }}
+        env:
+        - name: NODE_ENV
+          value: {{ .Values.metadata.env }}
+        command: ["sh"]
+        args:
+        - "-cx"
+        - "DEBUG=* npm start"
+        ports:
+          - containerPort: {{ .Values.expressapp.nodePorts.targetPort }}
+            name: expressapp
+        volumeMounts:
+        - name: {{ .Values.nodeName }}-data
+          mountPath: /app/db
+  volumeClaimTemplates: 
+  - metadata:
+      name: {{ .Values.nodeName }}-data
+    spec:
+      storageClassName: {{ .Values.storage.storageclassname }}
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{ .Values.storage.storagesize }}
